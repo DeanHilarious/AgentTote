@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "encoding": "Private keys, shared secret, derived key and nonce are hex. Public keys and envelope are standard padded base64. Plaintext is exact UTF-8.",
+  "phonePrivate": "202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+  "phonePublic": "NYBy1jZYgNGu6jKa35EhODhR7SGijjt16WXQ0s0WYlQ=",
+  "ephemeralPrivate": "404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f",
+  "ephemeralPublic": "eaYx7t4b+cmPEgMs3q3Q56B5OY/HhriMyEbsia+FpRo=",
+  "nonce": "000102030405060708090a0b",
+  "shared": "04c304fb1ca83cee75e206344231f33797e07d9929db670994b7c6fbeb1dc255",
+  "key": "2dd78763a7429b15477c07da43ba407fc0fdf356012b38f79c53446026ed1416",
+  "plaintext": "{\"v\":1,\"deviceId\":\"00112233-4455-6677-8899-aabbccddeeff\",\"macName\":\"测试 Mac\",\"taskId\":\"11112233-4455-4677-8899-aabbccddeeff\",\"agent\":\"codex\",\"sessionId\":\"session-1\",\"status\":\"completed\",\"title\":\"完成任务\",\"summary\":\"Done ✓\",\"endedAt\":1800000000000}",
+  "ciphertext": "AXmmMe7eG/nJjxIDLN6t0OegeTmPx4a4jMhG7ImvhaUaAAECAwQFBgcICQoLocVAAngzE+bcj0dnQg0HGnh0gzF2h8DjGh1v6HPG57XrE7Ffzi6VbbYpWjwLTlDiyUZCZTus4Ip5m5kLSHLlyFuYYpYP15WYOS1TUxQ6QcKG1e4TpEX4lS0lqBkXd7suI65ELYUyaruOXhq7Hn0kVXFU4+Tz2vs8P59p/TmtrAw6OECJaCeyZzcRW0D4il6uKyQbMudbAiaNAIV+8/t0sxo7vuaXj874V/ZtonBT3nipt7bTVLHtNoFPjQBPK52UXJgVWe66ZuhHEz2dWbdtd6wYXHVNxpfusay3H3UpU9/z3ySrRPQVNFBjITd2/phF/aqXRx/niTlBK771or5m1BEMoYOlZvK5PecUuYm3gXmu"
+}

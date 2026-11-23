@@ -1,0 +1,4 @@
+"CFBundleDisplayName" = "口袋智能体";
+"CFBundleName" = "口袋智能体";
+"NSCameraUsageDescription" = "扫描 Mac 上 AgentTote（口袋智能体）显示的配对二维码。";
+"NSLocalNetworkUsageDescription" = "连接 Mac 上运行的 AgentTote（口袋智能体）。";

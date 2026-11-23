@@ -1,0 +1,4 @@
+"CFBundleDisplayName" = "AgentTote";
+"CFBundleName" = "AgentTote";
+"NSCameraUsageDescription" = "Scan the pairing QR code shown by AgentTote on your Mac.";
+"NSLocalNetworkUsageDescription" = "Connect to AgentTote running on your Mac.";

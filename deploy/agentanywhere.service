@@ -1,0 +1,29 @@
+[Unit]
+Description=AgentAnywhere account and relay service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=agentanywhere
+Group=agentanywhere
+WorkingDirectory=/opt/agentanywhere
+EnvironmentFile=/etc/agentanywhere.env
+ExecStart=/opt/agentanywhere/node --no-warnings /opt/agentanywhere/server.mjs
+Restart=on-failure
+RestartSec=3
+
+# Only the data directory is writable. ProtectSystem=strict leaves /etc readable;
+# /etc/agentanywhere/apns.p8 is read through root:agentanywhere 0640 permissions.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/agentanywhere/data
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+
+[Install]
+WantedBy=multi-user.target

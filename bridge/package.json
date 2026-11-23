@@ -1,0 +1,35 @@
+{
+  "name": "agentanywhere-bridge",
+  "version": "2026.11.16",
+  "description": "Mac-side bridge that lets the AgentAnywhere iOS app drive Claude Code, Codex and WorkBuddy",
+  "type": "module",
+  "bin": {
+    "agentanywhere-bridge": "bin/agentanywhere-bridge.js"
+  },
+  "scripts": {
+    "start": "node --no-warnings src/index.ts",
+    "pair": "node --no-warnings src/index.ts --pair-only",
+    "login": "node --no-warnings src/index.ts --login",
+    "logout": "node --no-warnings src/index.ts --logout",
+    "typecheck": "tsc --noEmit",
+    "test": "node --no-warnings --test test/*.test.ts",
+    "workbuddy-key": "node --no-warnings src/index.ts --workbuddy-key",
+    "install-login-item": "node --no-warnings src/index.ts --install-login-item",
+    "uninstall-login-item": "node --no-warnings src/index.ts --uninstall-login-item",
+    "bundle": "node scripts/bundle.mjs"
+  },
+  "engines": {
+    "node": ">=23.6"
+  },
+  "dependencies": {
+    "qrcode-terminal": "^0.12.0",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/ws": "^8.5.13",
+    "esbuild": "^0.28.2",
+    "typescript": "^5.7.0"
+  },
+  "license": "MIT"
+}

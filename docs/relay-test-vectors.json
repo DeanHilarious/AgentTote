@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "encoding": "Keys, transcript, handshake messages and ciphertext are hexadecimal; counters are decimal strings; plaintext is exact UTF-8.",
+  "deviceId": "00112233-4455-6677-8899-aabbccddeeff",
+  "staticPrivate": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+  "phonePrivate": "202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+  "ephemeralPrivate": "404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f",
+  "staticPublic": "8f40c5adb68f25624ae5b214ea767a6ec94d829d3d7b5e1ad1ba6f3e2138285f",
+  "publicKey": "j0DFrbaPJWJK5bIU6nZ6bslNgp09e14a0bpvPiE4KF8",
+  "transcript": "41412d52454c41592d3100112233445566778899aabbccddeeff8f40c5adb68f25624ae5b214ea767a6ec94d829d3d7b5e1ad1ba6f3e2138285f358072d6365880d1aeea329adf9121383851ed21a28e3b75e965d0d2cd16625479a631eede1bf9c98f12032cdeadd0e7a079398fc786b88cc846ec89af85a51a",
+  "msg1": "01358072d6365880d1aeea329adf9121383851ed21a28e3b75e965d0d2cd166254",
+  "msg2": "0179a631eede1bf9c98f12032cdeadd0e7a079398fc786b88cc846ec89af85a51a1e49f181490a25f2c6962fe94949b92eb82ad07037d74c24e6fff6",
+  "k_p2b": "69d0442ad0f12e0a4c53ab82e66f02852d63067b7f3f2c3dc677812767f3a983",
+  "k_b2p": "026db26be3c1fb0a07d541b90a2350d9941777589dbd8b5df6e946f8aa543cb6",
+  "messages": [
+    {
+      "direction": "p2b",
+      "counter": "0",
+      "plaintext": "{\"auth\":\"example-ticket\"}",
+      "ciphertext": "fb9ee019eceb1e02c3bca850d92e55884b72c732bada1e9d8d0a7c639a9f9869747887500ac273bbd4"
+    },
+    {
+      "direction": "p2b",
+      "counter": "1",
+      "plaintext": "{\"id\":1,\"method\":\"hello\",\"params\":{}}",
+      "ciphertext": "1d823958e013e2274bfa22a9dcb8a51eda8e2ca4e0160edd96005736e587f79575f85b6803107ae68d132ca6f04597b11a83b11e94"
+    },
+    {
+      "direction": "b2p",
+      "counter": "1",
+      "plaintext": "{\"auth\":\"ok\"}",
+      "ciphertext": "502d5b5aa62ff27109b8e2a703c5a7eeb3b0a8e840a1a81ae3e9f12153"
+    }
+  ]
+}

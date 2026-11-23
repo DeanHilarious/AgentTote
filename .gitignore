@@ -1,0 +1,23 @@
+node_modules/
+.DS_Store
+xcuserdata/
+DerivedData/
+build/
+*.xcuserstate
+.claude/
+server/data/
+server/dist/
+bridge/dist/
+mac/.build/
+mac/dist/
+# OTA signing material belongs only on the release machine. Public keys are tracked.
+**/ed25519-private.pem
+**/ota/*private*
+**/ota-private*
+
+.env
+.env.*
+!.env.example
+*.p8
+*.p12
+*.mobileprovision

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+    <!-- Apple Silicon V8 generates JavaScript/WebAssembly code using MAP_JIT. -->
+    <key>com.apple.security.cs.allow-jit</key><true/>
+    <!-- Intel V8 changes executable page permissions without MAP_JIT, requiring
+         this exception for the x86_64 slice. build-app.sh removes it for arm64-only
+         builds. No native addons are bundled, so library validation stays on.
+         References: Node tools/osx-entitlements.plist; V8 platform-posix.cc and
+         build_config.h (V8_HAS_PTHREAD_JIT_WRITE_PROTECT is arm64-only). -->
+    <key>com.apple.security.cs.allow-unsigned-executable-memory</key><true/>
+</dict></plist>

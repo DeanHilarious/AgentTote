@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>PushKeychainAccessGroup</key>
+	<string>$(AppIdentifierPrefix)com.deanhilarious.agentanywhere.shared</string>
+	<!-- Merged with the keys Xcode generates from INFOPLIST_KEY_* build settings. -->
+	<!-- Export compliance: all cryptography goes through Apple's OS (URLSession TLS, CryptoKit X25519 /
+	     ChaCha20-Poly1305); no third-party or proprietary crypto, so the app qualifies for the exemption. -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.agentanywhere.pair</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>agentanywhere</string>
+			</array>
+		</dict>
+	</array>
+	<key>UIAppFonts</key>
+	<array>
+		<string>SpaceGrotesk.ttf</string>
+	</array>
+	<!-- Lets the app find a paired Mac again after its LAN address changes. -->
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_agentanywhere._tcp</string>
+	</array>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<!-- The bridge speaks plain ws:// to LAN IPs, .local names and Tailscale (WireGuard-encrypted) addresses. -->
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+		<key>NSExceptionDomains</key>
+		<dict>
+			<key>ts.net</key>
+			<dict>
+				<key>NSIncludesSubdomains</key>
+				<true/>
+				<key>NSExceptionAllowsInsecureHTTPLoads</key>
+				<true/>
+			</dict>
+		</dict>
+	</dict>
+</dict>
+</plist>

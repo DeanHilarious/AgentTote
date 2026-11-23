@@ -1,0 +1,28 @@
+{
+  "name": "agentanywhere-server",
+  "version": "2026.11.16",
+  "private": true,
+  "description": "AgentAnywhere account service: verification-code login, device directory, connect tickets",
+  "type": "module",
+  "scripts": {
+    "start": "node --no-warnings src/index.ts",
+    "bundle": "node scripts/bundle.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "node --no-warnings --test test/*.test.ts"
+  },
+  "engines": {
+    "node": ">=23.6"
+  },
+  "dependencies": {
+    "nodemailer": "^6.9.16",
+    "ws": "^8.22.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/nodemailer": "^6.4.17",
+    "@types/ws": "^8.18.2",
+    "esbuild": "^0.28.2",
+    "typescript": "^5.7.0"
+  },
+  "license": "MIT"
+}
