@@ -1,6 +1,6 @@
 {
   "name": "agentanywhere-server",
-  "version": "2026.11.16",
+  "version": "2026.11.23",
   "private": true,
   "description": "AgentAnywhere account service: verification-code login, device directory, connect tickets",
   "type": "module",

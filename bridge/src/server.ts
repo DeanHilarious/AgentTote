@@ -22,7 +22,7 @@ export interface ClientTransport {
   close(): void;
 }
 
-export const BRIDGE_VERSION = '2026.11.16';
+export const BRIDGE_VERSION = '2026.11.23';
 const AGENTS: readonly AgentKind[] = AGENT_KINDS;
 const MODES: PermissionMode[] = ['readOnly', 'acceptEdits', 'full'];
 
