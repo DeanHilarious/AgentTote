@@ -200,6 +200,7 @@ struct HelloResult: Codable {
     let agents: [AgentInfo]
     var deviceId: String?
     var push: PushStatus?
+    var supportsAttachments: Bool?
 }
 
 struct PushStatus: Codable, Equatable {

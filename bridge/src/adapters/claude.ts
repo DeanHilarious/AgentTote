@@ -1,3 +1,4 @@
+import { attachmentDirectories } from '../attachments.ts';
 import { readdir } from 'node:fs/promises';
 import { basename, join } from 'node:path';
 import { snapshotProcesses } from '../procs.ts';
@@ -204,6 +205,8 @@ export class ClaudeAdapter implements Adapter {
     const claude = await this.resolveBinary();
     if (!claude) throw new Error('Claude Code is not installed on this Mac');
     const args = ['-p', '--output-format', 'stream-json', '--include-partial-messages', '--verbose', '--permission-mode', PERMISSION_FLAGS[opts.permissionMode]];
+    const directories = attachmentDirectories(opts);
+    if (directories.length) args.push('--add-dir', ...directories);
     if (opts.sessionId) args.push('--resume', opts.sessionId);
     args.push('--', opts.prompt); // `--` so a prompt starting with "-" isn't read as a flag.
     return runStreamJson({ command: claude.bin, args, cwd, env: augmentedEnv(), retryWithoutPartialMessages: true, reportApiRetries: true }, sink);

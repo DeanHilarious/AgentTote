@@ -85,7 +85,13 @@ export interface TaskInfo {
   watching?: boolean;
 }
 
+export interface TaskAttachment {
+  path: string;
+  isImage: boolean;
+}
+
 export interface StartTaskOptions {
+  attachments?: TaskAttachment[];
   sessionId?: string;
   cwd?: string;
   prompt: string;

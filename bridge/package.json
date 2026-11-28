@@ -1,6 +1,6 @@
 {
   "name": "agentanywhere-bridge",
-  "version": "2026.11.23",
+  "version": "2026.11.28",
   "description": "Mac-side bridge that lets the AgentAnywhere iOS app drive Claude Code, Codex and WorkBuddy",
   "type": "module",
   "bin": {

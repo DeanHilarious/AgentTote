@@ -5,6 +5,7 @@ struct SessionDetailView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.locale) private var locale
     let route: SessionRoute
 
     @State private var sessionId: String?
@@ -14,6 +15,9 @@ struct SessionDetailView: View {
     /// Tasks shown below the history: started here, or already running when the screen opened.
     @State private var liveTaskIds: [String] = []
     @State private var draft = ""
+    @State private var attachments: [TaskAttachment] = []
+    @State private var importingAttachments = false
+    @State private var uploadProgress = 0.0
     @State private var followsBottom = true
     @State private var scrollTracking = ConversationScrollTracking()
     @State private var viewportHeight: CGFloat = 0
@@ -196,6 +200,9 @@ struct SessionDetailView: View {
             do { try await Task.sleep(for: .seconds(5)) } catch { return }
             modelNotice = nil
         }
+        .environment(\.markdownImageLocation, MarkdownImageLocation(
+            client: try? model.contentClient(), agent: route.agent, root: fileCwd, directory: fileCwd
+        ))
         .environment(\.openURL, OpenURLAction { url in
             if let path = LocalFileLink.resolve(url: url, cwd: fileCwd) {
                 localFile = FilePreviewDestination(path: path)
@@ -356,7 +363,7 @@ struct SessionDetailView: View {
                     .font(.caption).foregroundStyle(Brand.warning)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            if let sendError { Text(sendError).font(.caption).foregroundStyle(Brand.failure) }
+            if let sendError { Text(LocalizedStringKey(sendError)).font(.caption).foregroundStyle(Brand.failure) }
             if let copyNotice {
                 Text(copyNotice).font(.caption).foregroundStyle(Brand.muted)
                     .accessibilityAddTraits(.updatesFrequently)
@@ -379,9 +386,18 @@ struct SessionDetailView: View {
                 }
             }
             .frame(height: 44)
-            HStack(alignment: .bottom, spacing: 10) {
+            if !attachments.isEmpty { attachmentStrip }
+            if importingAttachments {
+                ProgressView("Loading attachments…").font(.caption)
+            } else if sending, !attachments.isEmpty {
+                ProgressView(value: uploadProgress) { Text("Sending attachments…").font(.caption) }
+            }
+            HStack(alignment: .bottom, spacing: 8) {
+                AttachmentPickerButton(attachments: $attachments, importing: $importingAttachments,
+                                       errorMessage: $sendError, supported: model.supportsAttachments)
+                    .disabled(sending || !model.isConnected || workBuddyNeedsConnection)
                 TextField(continueInCopy ? "Message a copy of this conversation…" : "Tell \(route.agent.displayName) what to do…", text: $draft, axis: .vertical)
-                    .disabled(workBuddyNeedsConnection)
+                    .disabled(workBuddyNeedsConnection || sending)
                     .lineLimit(1...6)
                     .focused($composerFocused)
                     .padding(.horizontal, 16).padding(.vertical, 12)
@@ -407,6 +423,26 @@ struct SessionDetailView: View {
         .padding(.horizontal, 12).padding(.vertical, 10)
         .background(Brand.surface)
         .overlay(alignment: .top) { Rectangle().fill(Brand.line).frame(height: 1) }
+    }
+
+    private var attachmentStrip: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(attachments) { file in
+                    HStack(spacing: 6) {
+                        Image(systemName: "paperclip")
+                        Text(verbatim: file.name).lineLimit(1).truncationMode(.middle).frame(maxWidth: 160)
+                        Button { attachments.removeAll { $0.id == file.id } } label: {
+                            Image(systemName: "xmark.circle.fill").frame(minWidth: 28, minHeight: 32)
+                        }
+                        .disabled(sending || importingAttachments)
+                        .accessibilityLabel(Text("Remove \(file.name)"))
+                    }
+                    .font(.caption).padding(.leading, 10).padding(.trailing, 4)
+                    .background(Brand.paper, in: Capsule())
+                }
+            }
+        }
     }
 
     private var permissions: some View {
@@ -439,7 +475,9 @@ struct SessionDetailView: View {
     }
 
     private var canSend: Bool {
-        !sending && !workBuddyNeedsConnection && model.isConnected && !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        !sending && !importingAttachments && !workBuddyNeedsConnection && model.isConnected
+            && (!trimmedDraft.isEmpty || !attachments.isEmpty)
+            && (attachments.isEmpty || model.supportsAttachments)
             && model.agent(route.agent)?.status != .unavailable
     }
 
@@ -514,8 +552,7 @@ struct SessionDetailView: View {
 
     private func send() async {
         guard canSend else { return }
-        let prompt = trimmedDraft
-        guard !prompt.isEmpty else { return }
+        let prompt = trimmedDraft.isEmpty ? String(localized: "Please review the attached files.", locale: locale) : trimmedDraft
         await start(prompt: prompt, sessionId: sessionId, fork: continueInCopy)
     }
 
@@ -530,11 +567,13 @@ struct SessionDetailView: View {
     private func start(prompt: String, sessionId targetSessionId: String?, fork: Bool) async {
         guard !sending else { return }
         sending = true
+        uploadProgress = 0
         sendError = nil
         defer { sending = false }
         do {
             let task = try await model.startTask(agent: route.agent, sessionId: targetSessionId,
-                cwd: targetSessionId == nil ? route.cwd : nil, prompt: prompt, mode: mode, fork: fork)
+                cwd: targetSessionId == nil ? route.cwd : nil, prompt: prompt, mode: mode, fork: fork,
+                attachments: attachments, uploadProgress: { uploadProgress = $0 })
             // The bridge reports a busy session as a task that failed at once, not as an RPC error.
             if task.status == .failed, let error = task.error, error.hasPrefix("SESSION_BUSY:") {
                 showBusy(prompt: prompt, sessionId: targetSessionId, fork: fork)
@@ -542,7 +581,10 @@ struct SessionDetailView: View {
             }
             startedHere = true
             liveTaskIds.append(task.id)
-            draft = ""
+            if task.status != .failed || attachments.isEmpty {
+                draft = ""
+                attachments = []
+            }
             if fork {
                 continueInCopy = false
                 if let newId = task.sessionId, newId != sessionId {

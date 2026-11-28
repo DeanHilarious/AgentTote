@@ -216,9 +216,22 @@ struct FilePreviewView: View {
         switch type {
         case .text, .markdown:
             if size > 1024 * 1024 { Text("Showing the first 1 MiB. Share to save the complete file.").font(.caption).foregroundStyle(Brand.muted).padding(.horizontal) }
-            ScrollView([.vertical, .horizontal]) {
-                if type == .markdown && !source { MarkdownFileContent(text: text).frame(maxWidth: 700, alignment: .leading).padding() }
-                else { Text(text).font(.system(.body, design: .monospaced)).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading).padding() }
+            if type == .markdown && !source {
+                ScrollView {
+                    ConversationMarkdown(text: text)
+                        .frame(maxWidth: 700, alignment: .leading)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding()
+                }
+                .environment(\.markdownImageLocation, MarkdownImageLocation(
+                    client: client, agent: agent, root: resolvedRoot ?? cwd,
+                    directory: ((resolvedPath ?? path) as NSString).deletingLastPathComponent
+                ))
+            } else {
+                ScrollView([.vertical, .horizontal]) {
+                    Text(text).font(.system(.body, design: .monospaced)).textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading).padding()
+                }
             }
         case .image:
             if let image = UIImage(data: data) { ZoomableFileImage(image: image) }
@@ -270,36 +283,6 @@ struct FilePreviewView: View {
             } else { self.error = error.localizedDescription }
         }
         loading = false
-    }
-}
-
-private struct MarkdownFileContent: View {
-    let text: String
-    var body: some View {
-        // Foundation renders inline Markdown; block structure retains headings,
-        // paragraphs and fenced code without loading third-party dependencies.
-        LazyVStack(alignment: .leading, spacing: 8) {
-            ForEach(Array(blocks.enumerated()), id: \.offset) { _, block in
-                if block.code { Text(block.text).font(.system(.body, design: .monospaced)).padding(10).background(Brand.line, in: RoundedRectangle(cornerRadius: 8)).textSelection(.enabled) }
-                else {
-                    Text((try? AttributedString(markdown: block.text, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace))) ?? AttributedString(block.text))
-                        .font(block.heading ? .title3.bold() : .body).textSelection(.enabled)
-                }
-            }
-        }
-    }
-    private var blocks: [(text: String, code: Bool, heading: Bool)] {
-        var result: [(String, Bool, Bool)] = [], code = false, pending = ""
-        for line in text.components(separatedBy: "\n") {
-            if line.hasPrefix("```") {
-                if !pending.isEmpty { result.append((pending, code, false)); pending = "" }
-                code.toggle()
-            } else if code { pending += line + "\n" }
-            else if line.hasPrefix("#") { result.append((String(line.drop(while: { $0 == "#" || $0 == " " })), false, true)) }
-            else { result.append((line.isEmpty ? " " : line, false, false)) }
-        }
-        if !pending.isEmpty { result.append((pending, code, false)) }
-        return result
     }
 }
 

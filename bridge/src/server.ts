@@ -12,6 +12,7 @@ import { verifyTicket } from './ticket.ts';
 import { PushManager } from './push.ts';
 import type { PushAccount } from './push.ts';
 import { redactSecrets } from './secrets.ts';
+import { displayAttachmentPrompt, TaskAttachments } from './attachments.ts';
 import { TaskManager } from './tasks.ts';
 import { ModelCatalog, validateModel } from './models.ts';
 import { AGENT_KINDS, LEGACY_AGENT_KINDS, type Adapter, type AgentInfo, type AgentKind, type PermissionMode, type PushMessage, type RpcRequest, type RpcResponse, type SessionSummary, type PushStatus } from './types.ts';
@@ -23,7 +24,7 @@ export interface ClientTransport {
   close(): void;
 }
 
-export const BRIDGE_VERSION = '2026.11.23';
+export const BRIDGE_VERSION = '2026.11.28';
 const AGENTS: readonly AgentKind[] = AGENT_KINDS;
 const MODES: PermissionMode[] = ['readOnly', 'acceptEdits', 'full'];
 
@@ -90,6 +91,7 @@ async function detectEnabledAgents(cfg: { disabledAgents?: AgentKind[] }, adapte
 export async function bridgeHello(cfg: Pick<BridgeConfig, 'name' | 'deviceId' | 'publicKey'> & Partial<Pick<BridgeConfig, 'disabledAgents'>>, adapters: Adapter[], push: PushStatus = { available: false, reason: 'signed_out' }, icons: IconProvider = agentIcons) {
   return {
     push,
+    supportsAttachments: true,
     name: cfg.name,
     deviceId: cfg.deviceId,
     version: BRIDGE_VERSION,
@@ -136,6 +138,7 @@ export function startServer(cfg: BridgeConfig, adapters: Adapter[], log: (msg: s
   const tasks = new TaskManager(adapters, broadcast, (task, id) => push.send(task, id), (id, text) => previews.observe(id, text));
   const files = new ProjectFiles(() => tasks.allAdapters(), () => cfg.disabledAgents);
   const models = new ModelCatalog();
+  const attachments = new TaskAttachments();
   const flow = new AgentFlowStore({
     ...agentFlowOptions,
     getBridgeAgents: () => detectEnabledAgents(cfg, tasks.allAdapters(), icons),
@@ -179,7 +182,11 @@ export function startServer(cfg: BridgeConfig, adapters: Adapter[], log: (msg: s
       return { agent, iconHash: icon.iconHash, png: icon.png.toString('base64') };
     },
     'sessions.list': (p, client) => listSessions(enabledAgent(p, client), limitParam(p, 30, 200)),
-    'sessions.messages': (p, client) => tasks.adapter(enabledAgent(p, client)).getMessages(str(p, 'sessionId')!, limitParam(p, 60, 500)),
+    'sessions.messages': async (p, client) => {
+      const adapter = tasks.adapter(enabledAgent(p, client));
+      const messages = await adapter.getMessages(str(p, 'sessionId')!, limitParam(p, 60, 500));
+      return messages.map(m => m.role === 'user' ? { ...m, text: displayAttachmentPrompt(m.text) } : m);
+    },
     'projects.recent': async (p, client) => {
       // Working directories seen across all agents, for picking where a new session should run.
       const byPath = new Map<string, { path: string; agents: AgentKind[]; updatedAt: number }>();
@@ -213,6 +220,9 @@ export function startServer(cfg: BridgeConfig, adapters: Adapter[], log: (msg: s
       if (typeof p.watch !== 'boolean') throw new Error('Invalid watch');
       return tasks.watch(str(p, 'taskId')!, id, p.watch);
     },
+    'attachments.begin': (p, client) => attachments.begin(client, p.name, p.size),
+    'attachments.chunk': (p, client) => attachments.chunk(client, p.id, p.offset, p.data),
+    'attachments.discard': (p, client) => attachments.discard(client, str(p, 'id')!),
     'tasks.start': async (p, client) => {
       const kind = enabledAgent(p, client);
       if (p.watch !== undefined && typeof p.watch !== 'boolean') throw new Error('Invalid watch');
@@ -236,8 +246,12 @@ export function startServer(cfg: BridgeConfig, adapters: Adapter[], log: (msg: s
         if (options !== undefined) validateModel(options, model, effort);
         enabledAgent(p, client);
       }
-      const task = await tasks.start(kind, { sessionId, cwd, prompt: str(p, 'prompt')!, permissionMode: mode, model, effort, fork },
-        p.watch === true ? installation(client) : undefined);
+      const prompt = str(p, 'prompt')!;
+      const task = await attachments.start(client, p.attachmentIds, () => tasks.list(), files => {
+        enabledAgent(p, client);
+        return tasks.start(kind, { sessionId, cwd, prompt, permissionMode: mode, model, effort, fork,
+          ...(files.length ? { attachments: files } : {}) }, p.watch === true ? installation(client) : undefined);
+      });
       files.invalidate();
       return tasks.get(task.id, 0, installation(client)).task;
     },
@@ -257,7 +271,7 @@ export function startServer(cfg: BridgeConfig, adapters: Adapter[], log: (msg: s
     clients.add(client);
     onClients(clients.size);
     return {
-      disconnect: () => { previews.disconnect(client); if (clients.delete(client)) onClients(clients.size); },
+      disconnect: () => { attachments.disconnect(client); previews.disconnect(client); if (clients.delete(client)) onClients(clients.size); },
       receive: async (text: string) => {
         if (!clients.has(client)) return;
         let req: RpcRequest;
@@ -274,7 +288,10 @@ export function startServer(cfg: BridgeConfig, adapters: Adapter[], log: (msg: s
           res = { id: req.id, result: (await handler(req.params ?? {}, client)) ?? null };
         } catch (err) {
           res = { id: req.id, error: { message: (err as Error).message } };
-          if (req.method.startsWith('files.') || req.method.startsWith('preview.')) log(req.method);
+          if (req.method.startsWith('files.') || req.method.startsWith('preview.')
+            || req.method.startsWith('attachments.') || (req.method === 'tasks.start' && req.params?.attachmentIds)) {
+            log(req.method);
+          }
           else log(client.kind === 'relay' ? '中转 RPC failed' : `${req.method} failed: ${(err as Error).message}`);
         }
         if (client.kind === 'local' && req.method === 'tasks.start' && 'result' in res) log(`Task started on ${(req.params as any)?.agent}`);
@@ -327,6 +344,7 @@ export function startServer(cfg: BridgeConfig, adapters: Adapter[], log: (msg: s
 
   // Drop phones that vanished without closing (e.g. walked out of Wi-Fi range).
   const heartbeat = setInterval(() => {
+    void attachments.prune(() => tasks.list()).catch(() => log('Attachment cleanup failed'));
     for (const c of wss.clients as Set<WebSocket & { alive?: boolean }>) {
       if (!c.alive) {
         c.terminate();
@@ -336,7 +354,12 @@ export function startServer(cfg: BridgeConfig, adapters: Adapter[], log: (msg: s
       c.ping();
     }
   }, 30_000);
-  http.on('close', () => { clearInterval(heartbeat); push.close(); previews.close(); });
+  http.on('close', () => {
+    clearInterval(heartbeat);
+    push.close();
+    previews.close();
+    void attachments.close().catch(() => log('Attachment cleanup failed'));
+  });
 
   const controlled = Object.assign(http, {
     agentFlow: flow,
@@ -368,7 +391,7 @@ export function startServer(cfg: BridgeConfig, adapters: Adapter[], log: (msg: s
       for (const task of tasks.list()) if (task.status === 'running') tasks.cancel(task.id);
       for (const client of clients) client.close();
       wss.close();
-      http.close(error => error ? reject(error) : resolve());
+      http.close(error => { void attachments.close().then(() => error ? reject(error) : resolve(), reject); });
       http.closeAllConnections();
     }),
   });
@@ -382,7 +405,10 @@ export function startServer(cfg: BridgeConfig, adapters: Adapter[], log: (msg: s
     };
     http.once('error', failed);
     try {
-      http.listen(cfg.port, '0.0.0.0', () => resolve(controlled));
+      http.listen(cfg.port, '0.0.0.0', () => {
+        void attachments.removeOrphans().catch(() => log('Could not clean up attachments left by a previous bridge'));
+        resolve(controlled);
+      });
     } catch (error) {
       failed(error as Error);
     }

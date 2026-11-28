@@ -1,3 +1,4 @@
+import { attachmentDirectories } from '../attachments.ts';
 import { readdir, readFile } from 'node:fs/promises';
 import { basename, dirname, join } from 'node:path';
 import { snapshotProcesses } from '../procs.ts';
@@ -163,6 +164,8 @@ export class WorkBuddyAdapter implements Adapter {
     }
     if (!cwd) throw new Error('A working directory is required for a new WorkBuddy task');
     const args = [this.options.cli ?? WORKBUDDY_CLI, '-p', '--output-format', 'stream-json', '--include-partial-messages', '--permission-mode', PERMISSION_FLAGS[opts.permissionMode]];
+    const directories = attachmentDirectories(opts);
+    if (directories.length) args.push('--add-dir', ...directories);
     if (opts.sessionId) args.push('--resume', opts.sessionId);
     if (opts.model !== undefined) args.push('--model', opts.model);
     if (opts.effort !== undefined) args.push('--effort', opts.effort);

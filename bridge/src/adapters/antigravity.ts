@@ -1,3 +1,4 @@
+import { attachmentDirectories } from '../attachments.ts';
 import { spawn } from 'node:child_process';
 import { cp, copyFile, mkdir, readdir, readFile, stat } from 'node:fs/promises';
 import { createRequire } from 'node:module';
@@ -525,6 +526,7 @@ export class AntigravityAdapter implements Adapter {
     if (!cwd) throw new Error('A working directory is required for a new Antigravity task');
 
     const args = ['--output-format', 'stream-json', ...PERMISSION_FLAGS[opts.permissionMode]];
+    for (const directory of attachmentDirectories(opts)) args.push('--add-dir', directory);
     if (opts.sessionId) args.push('--conversation', opts.sessionId);
     if (opts.model !== undefined) args.push('--model', opts.model);
     if (opts.effort !== undefined) args.push('--effort', opts.effort);

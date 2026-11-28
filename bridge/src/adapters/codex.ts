@@ -1,3 +1,4 @@
+import { displayAttachmentPrompt } from '../attachments.ts';
 import { open } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
@@ -196,6 +197,8 @@ function codexUserText(item: any): string {
     .filter((c: any) => c.type === 'text')
     .map((c: any) => String(c.text))
     .join('\n');
+  const display = displayAttachmentPrompt(text);
+  if (display !== text) return display;
   const marker = '## My request:';
   const i = text.lastIndexOf(marker);
   return (i >= 0 ? text.slice(i + marker.length) : text).trim();
@@ -442,7 +445,8 @@ export class CodexAdapter implements Adapter {
     });
 
     try {
-      const res = await this.server.request('turn/start', { threadId, input: [{ type: 'text', text: opts.prompt, text_elements: [] }],
+      const images = (opts.attachments ?? []).filter(file => file.isImage).map(file => ({ type: 'localImage', path: file.path }));
+      const res = await this.server.request('turn/start', { threadId, input: [{ type: 'text', text: opts.prompt, text_elements: [] }, ...images],
         ...(opts.model !== undefined ? { model: opts.model } : {}),
         ...(opts.effort !== undefined ? { effort: opts.effort } : {}) });
       turnId = res.turn?.id;

@@ -43,6 +43,7 @@ final class AppModel {
     let notifications = PushRegistration.shared
     private(set) var pushStatus: PushStatus?
     private(set) var pushRegistrationFailed = false
+    private(set) var supportsAttachments = false
     private(set) var bridgeDeviceId: String?
 
     @ObservationIgnored private var registeredPushToken: String?
@@ -609,6 +610,7 @@ final class AppModel {
         isReconnecting = false
         reconnectAttempt = 0
         connection = .connected(host: host, viaRelay: viaRelay)
+        supportsAttachments = hello.supportsAttachments == true
         bridgeVersion = hello.version
         agents = hello.agents
         bridgeDeviceId = hello.deviceId ?? selectedDeviceId?.uuidString
@@ -726,6 +728,7 @@ final class AppModel {
         agentFlow = nil
         agentFlowSupported = true
         draftStore.reset()
+        supportsAttachments = false
         bridgeVersion = nil
         bridgeDeviceId = nil
         pushStatus = nil
@@ -839,7 +842,12 @@ final class AppModel {
         try await bridgeCall("projects.recent", ["limit": 40])
     }
 
-    func startTask(agent: AgentKind, sessionId: String?, cwd: String?, prompt: String, mode: PermissionMode, fork: Bool = false) async throws -> TaskInfo {
+    func startTask(
+        agent: AgentKind, sessionId: String?, cwd: String?, prompt: String, mode: PermissionMode,
+        fork: Bool = false, attachments: [TaskAttachment] = [], uploadProgress: (Double) -> Void = { _ in }
+    ) async throws -> TaskInfo {
+        let client = try contentClient()
+        guard attachments.isEmpty || supportsAttachments else { throw TaskAttachment.Failure.unsupported }
         let epoch = connectionGeneration
         let watch = UserDefaults.standard.bool(forKey: PushRegistration.autoWatchPreference)
         if watch {
@@ -848,7 +856,7 @@ final class AppModel {
             try checkConnection(epoch)
         }
         let selection = bridgeDeviceId.map { modelSelections.selection(deviceId: $0, agent: agent) } ?? ModelSelection()
-        let task: TaskInfo = try await client.call("tasks.start", [
+        let task = try await client.startTask([
             "agent": agent.rawValue,
             "sessionId": sessionId,
             "cwd": cwd,
@@ -858,7 +866,7 @@ final class AppModel {
             "effort": selection.effort,
             "watch": watch,
             "fork": fork ? true : nil,
-        ])
+        ], attachments: attachments, progress: uploadProgress)
         try checkConnection(epoch)
         merge(task)
         rememberWatch(task.id, watch: watch && tasks[task.id]?.status == .running)

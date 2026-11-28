@@ -71,6 +71,12 @@ Open `ios/AgentAnywhere.xcodeproj` in Xcode 26, pick your team under *Signing & 
 (use your own bundle identifiers and matching app group for device signing), and run on your iPhone (iOS 17+).
 Then tap **Scan QR code**, or point the system Camera at the QR code.
 
+### iPhone 会话里的图表与附件
+
+回复支持标题、列表、引用、代码块、表格和 Markdown 图片。项目内的图片由配对的 Mac 提供。使用 Mermaid 代码块可以直接在手机上查看常见流程图、饼图、柱状图和折线图，其他语法可以展开查看源码。
+
+更新 iPhone 客户端和 Mac Bridge 后，点会话输入框旁的回形针，从「照片」或「文件」选择附件。每条消息最多 4 个，每个最大 10 MiB。可以只发附件，也可以附上问题。上传完成后，Bridge 才会用当前权限启动任务。Codex 可以直接接收图片，文档通过 Mac 上的临时文件提供给智能体。
+
 ## Mac menu bar app
 
 The native macOS 14+ menu bar app in [`mac/`](mac/README.md) manages the bridge, pairing QR, account sign-in, settings and logs. Build with `cd mac && swift build`; see its README for development runtime environment variables and testing. Stop a Terminal or legacy login-item bridge before starting the app on the same port.

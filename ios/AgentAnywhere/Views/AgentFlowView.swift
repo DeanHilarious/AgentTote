@@ -1166,10 +1166,8 @@ struct AgentFlowRunDetailView: View {
                         .buttonStyle(.plain)
                     }
                     Divider().overlay(Brand.separator)
-                    Text(spec)
-                        .font(.system(.footnote, design: .monospaced))
+                    ConversationMarkdown(text: spec)
                         .foregroundStyle(Brand.ink)
-                        .textSelection(.enabled)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .fixedSize(horizontal: false, vertical: true)
                 }

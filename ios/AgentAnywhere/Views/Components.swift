@@ -110,28 +110,29 @@ struct MessageBubble: View {
     var body: some View {
         HStack {
             if role == .user { Spacer(minLength: 40) }
-            Text(content)
-                .textSelection(.enabled)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 14)
-                .foregroundStyle(role == .user ? Color.white : Brand.ink)
-                .background(
-                    role == .user ? AnyShapeStyle(Brand.inkFill) : AnyShapeStyle(Brand.surface),
-                    in: ConversationShape(user: role == .user)
-                )
-                .shadow(color: .black.opacity(role == .assistant ? 0.04 : 0), radius: 2, y: 1)
+            Group {
+                if role == .assistant {
+                    VStack(alignment: .leading, spacing: 2) {
+                        ConversationMarkdown(text: text, streaming: cursorVisible != nil)
+                        if let cursorVisible {
+                            Text(verbatim: "▏").foregroundStyle(cursorVisible ? Brand.ink : .clear)
+                                .accessibilityHidden(true)
+                        }
+                    }
+                } else {
+                    Text(markdown).textSelection(.enabled)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+            .foregroundStyle(role == .user ? Color.white : Brand.ink)
+            .background(
+                role == .user ? AnyShapeStyle(Brand.inkFill) : AnyShapeStyle(Brand.surface),
+                in: ConversationShape(user: role == .user)
+            )
+            .shadow(color: .black.opacity(role == .assistant ? 0.04 : 0), radius: 2, y: 1)
             if role == .assistant { Spacer(minLength: 24) }
         }
-    }
-
-    private var content: AttributedString {
-        var content = markdown
-        if let cursorVisible {
-            var cursor = AttributedString(" ▏")
-            cursor.foregroundColor = cursorVisible ? Brand.ink : .clear
-            content.append(cursor)
-        }
-        return content
     }
 
     private var markdown: AttributedString {

@@ -79,6 +79,21 @@ test('fork calls thread/fork with resume-style params and continues on the new t
   }
 });
 
+test('Codex passes uploaded image paths as native image inputs alongside the document prompt', async () => {
+  const server = new FakeCodexServer();
+  const photo = '/tmp/private/photo.png';
+  const document = '/tmp/private/notes.pdf';
+  await new CodexAdapter(server).startTask({
+    sessionId: 'old', prompt: `Read ${document}`, permissionMode: 'readOnly',
+    attachments: [{ path: photo, isImage: true }, { path: document, isImage: false }],
+  }, makeSink());
+  const turn = server.requests.find(r => r.method === 'turn/start')!;
+  assert.deepEqual(turn.params.input, [
+    { type: 'text', text: `Read ${document}`, text_elements: [] },
+    { type: 'localImage', path: photo },
+  ]);
+});
+
 test('active-writer failures surface as SESSION_BUSY, other errors unchanged', async () => {
   for (const method of ['thread/resume', 'turn/start']) {
     const server = new FakeCodexServer();

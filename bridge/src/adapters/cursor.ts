@@ -1,3 +1,4 @@
+import { attachmentDirectories } from '../attachments.ts';
 import { readFile, stat } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { configDirectory } from '../config.ts';
@@ -245,6 +246,7 @@ export class CursorAdapter implements Adapter {
 
   private buildArgs(opts: StartTaskOptions, target: { cwd: string; sessionId?: string }): string[] {
     const args = ['--print', '--output-format', 'stream-json', '--stream-partial-output', '--workspace', target.cwd, '--trust'];
+    for (const directory of attachmentDirectories(opts)) args.push('--add-dir', directory);
     args.push(...PERMISSION_FLAGS[opts.permissionMode]);
     if (opts.model !== undefined) args.push('--model', opts.model);
     if (target.sessionId) args.push('--resume', target.sessionId);

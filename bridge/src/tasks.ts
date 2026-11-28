@@ -1,3 +1,4 @@
+import { attachmentPrompts } from './attachments.ts';
 import { randomUUID } from 'node:crypto';
 import type { Adapter, AgentKind, PushMessage, RunningTask, StartTaskOptions, TaskEvent, TaskEventBody, TaskInfo, TaskDraft } from './types.ts';
 
@@ -91,13 +92,14 @@ export class TaskManager {
         }
       }
     }
+    const prompt = attachmentPrompts(opts.prompt, opts.attachments);
     const rec: TaskRecord = {
       info: {
         id: randomUUID(),
         agent,
         sessionId: opts.sessionId,
         cwd: opts.cwd ?? '',
-        prompt: opts.prompt,
+        prompt: prompt.display,
         permissionMode: opts.permissionMode,
         model: opts.model,
         effort: opts.effort,
@@ -159,7 +161,7 @@ export class TaskManager {
     };
 
     try {
-      rec.handle = await adapter.startTask(opts, {
+      rec.handle = await adapter.startTask({ ...opts, prompt: prompt.agent }, {
         emit,
         output: text => {
           this.output(rec.info.id, text);
