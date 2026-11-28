@@ -1,6 +1,8 @@
 import SwiftUI
 import AppKit
 
+let hubWindowID = "hub"
+
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     let model = BridgeModel()
@@ -14,10 +16,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             || NSClassFromString("XCTestCase") != nil
     }
 
+    func applicationWillFinishLaunching(_ notification: Notification) {
+        NotificationCenter.default.addObserver(self, selector: #selector(configureHubWindow(_:)),
+            name: NSWindow.didUpdateNotification, object: nil)
+    }
+
+    @objc private func configureHubWindow(_ notification: Notification) {
+        guard let window = notification.object as? NSWindow, window.identifier?.rawValue == hubWindowID,
+              !window.collectionBehavior.contains([.primary, .fullScreenPrimary]) else { return }
+        // SwiftUI can restore the singleton window's auxiliary role when leaving full screen.
+        var behavior = window.collectionBehavior
+        behavior.subtract([.auxiliary, .canJoinAllApplications, .fullScreenAuxiliary, .fullScreenNone])
+        behavior.formUnion([.primary, .fullScreenPrimary])
+        window.collectionBehavior = behavior
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         Brand.registerFonts()
         signal(SIGPIPE, SIG_IGN)
         NSApp.setActivationPolicy(.regular)
+        NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            let modifiers = event.modifierFlags.intersection([.command, .control, .shift, .option, .function])
+            guard let window = event.window, window.identifier?.rawValue == hubWindowID,
+                  modifiers == [.control, .command],
+                  event.charactersIgnoringModifiers?.lowercased() == "f" else { return event }
+            if !event.isARepeat { window.toggleFullScreen(nil) }
+            return nil
+        }
         model.start()
         updater.start()
         if !Self.isRunningTests {
@@ -66,11 +91,11 @@ private struct MenuBarLabel: View {
             .task {
                 guard !didOpenOnLaunch, !AppDelegate.isRunningTests else { return }
                 didOpenOnLaunch = true
-                openWindow(id: "hub")
+                openWindow(id: hubWindowID)
                 NSApp.activate(ignoringOtherApps: true)
             }
             .onReceive(NotificationCenter.default.publisher(for: .showMainWindow)) { _ in
-                openWindow(id: "hub")
+                openWindow(id: hubWindowID)
                 NSApp.activate(ignoringOtherApps: true)
             }
     }
@@ -91,7 +116,7 @@ struct AgentAnywhereMacApp: App {
         }
         .menuBarExtraStyle(.window)
 
-        Window("AgentTote Hub", id: "hub") {
+        Window("AgentTote Hub", id: hubWindowID) {
             AgentHubView().environment(delegate.model).environment(delegate.system).environment(delegate.updater)
                 .environment(\.locale, Locale(identifier: language))
         }

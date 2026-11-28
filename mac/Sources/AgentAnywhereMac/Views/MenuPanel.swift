@@ -30,7 +30,7 @@ struct MenuPanel: View {
             HStack(spacing: 8) {
                 Button {
                     model.hubInitialSection = .commandCenter
-                    show("hub")
+                    show(hubWindowID)
                 } label: {
                     Label("Open AgentTote Hub", systemImage: "macwindow")
                 }
@@ -38,7 +38,7 @@ struct MenuPanel: View {
 
                 Button {
                     model.hubInitialSection = .agentFlow
-                    show("hub")
+                    show(hubWindowID)
                 } label: {
                     Label("Agent-Flow Studio…", systemImage: "point.3.connected.trianglepath.dotted")
                 }
