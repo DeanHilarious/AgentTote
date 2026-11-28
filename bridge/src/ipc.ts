@@ -1,4 +1,5 @@
 import { agentIcons, withAgentIcon, type IconProvider } from './agentIcons.ts';
+import type { AgentFlowStore } from './agentFlow.ts';
 import { KeepAwake } from './keepAwake.ts';
 import { loadIdentity } from './identity.ts';
 import { RelayClient } from './relay.ts';
@@ -78,6 +79,8 @@ export function createIpcController(options: {
     save: typeof saveWorkBuddyKey;
     clear: typeof deleteWorkBuddyKey;
   };
+  agentFlow?: Pick<AgentFlowStore, 'snapshot' | 'getRun'>;
+  callRpc?: (method: string, params: Record<string, unknown>) => Promise<unknown>;
 }) {
   const { cfg, account, adapters, server, emit } = options;
   let hosts = options.hosts ?? reachableAddresses();
@@ -209,6 +212,53 @@ export function createIpcController(options: {
         return { restartRequired: patch.port !== undefined };
       }
       case 'agents.refresh': return refresh();
+      case 'agentFlow.snapshot': {
+        let limit: number | undefined;
+        if (p.limit !== undefined) {
+          if (typeof p.limit !== 'number' || !Number.isInteger(p.limit) || p.limit < 1 || p.limit > 100) {
+            invalid('Expected limit from 1 to 100');
+          }
+          limit = p.limit;
+        }
+        if (options.agentFlow) return options.agentFlow.snapshot(limit);
+        if (options.callRpc) {
+          try { return await options.callRpc('agentFlow.snapshot', p); }
+          catch (err) {
+            if (err instanceof IpcError) throw err;
+            throw new IpcError('rpc_error', redactSecrets((err as Error).message));
+          }
+        }
+        throw new IpcError('unavailable', 'Bridge RPC is unavailable');
+      }
+      case 'agentFlow.run': {
+        const id = text(p, 'id');
+        try {
+          if (options.agentFlow) return await options.agentFlow.getRun(id);
+          if (options.callRpc) return await options.callRpc('agentFlow.run', { ...p, id });
+          throw new IpcError('unavailable', 'Bridge RPC is unavailable');
+        } catch (err) {
+          if (err instanceof IpcError) throw err;
+          const message = redactSecrets((err as Error).message);
+          if (message.startsWith('Unknown Agent-Flow run:')) throw new IpcError('not_found', message);
+          if (message.startsWith('Invalid Agent-Flow run')) throw new IpcError('invalid_params', message);
+          throw new IpcError('rpc_error', message);
+        }
+      }
+      case 'agents.models':
+      case 'sessions.list':
+      case 'sessions.messages':
+      case 'projects.recent':
+      case 'tasks.start':
+      case 'tasks.cancel':
+      case 'tasks.list':
+      case 'tasks.get': {
+        if (!options.callRpc) throw new IpcError('unavailable', 'Bridge RPC is unavailable');
+        try { return await options.callRpc(method, p); }
+        catch (err) {
+          if (err instanceof IpcError) throw err;
+          throw new IpcError('rpc_error', redactSecrets((err as Error).message));
+        }
+      }
       case 'shutdown': return null;
       default: throw new IpcError('unknown_method', 'Unknown IPC method');
     }
@@ -239,12 +289,14 @@ export async function runIpc(adapters: Adapter[], configOptions: Parameters<type
   let network: NetworkMonitor | undefined;
   let bonjour: BonjourPublisher | undefined;
   let awake: KeepAwake | undefined;
+  let unsubBroadcast: (() => void) | undefined;
   let closing = false;
   const input = createInterface({ input: process.stdin, terminal: false });
   // Subscribe synchronously: Process may send commands or EOF while startup is awaiting disk/network.
   const finish = async (code = 0) => {
     if (closing) return;
     closing = true;
+    unsubBroadcast?.();
     awake?.stop();
     if (timer) clearInterval(timer);
     relay?.stop();
@@ -254,6 +306,7 @@ export async function runIpc(adapters: Adapter[], configOptions: Parameters<type
     input.close();
     const deadline = setTimeout(() => process.exit(code), 5_000);
     await boot.catch(() => undefined);
+    unsubBroadcast?.();
     awake?.stop();
     relay?.stop();
     account?.stop();
@@ -276,6 +329,11 @@ export async function runIpc(adapters: Adapter[], configOptions: Parameters<type
     server = await startServer(cfg, adapters, log,
       () => ({ userId: account!.user?.id, publicKeyPem: account!.publicKeyPem }),
       count => emit('clients', { count }), account);
+    unsubBroadcast = server.onBroadcast(msg => {
+      if (msg.event === 'task.updated' || msg.event === 'task.event' || msg.event === 'task.delta') {
+        emit(msg.event, msg.data);
+      }
+    });
     relay = new RelayClient({ config: cfg, identity, account, attachClient: server.attachClient, log,
       onChange: state => emit('relay', state) });
     bonjour = new BonjourPublisher({ registration: { name: cfg.name, port: cfg.port, deviceId: cfg.deviceId, version: BRIDGE_VERSION }, log });
@@ -283,7 +341,9 @@ export async function runIpc(adapters: Adapter[], configOptions: Parameters<type
     const controller = createIpcController({ cfg, account, adapters, server, emit, rememberToken: token => tokens.add(token),
       keepAwake: awake,
       relayStatus: () => relay!.status,
-      onNameChange: name => bonjour!.rename(name) });
+      onNameChange: name => bonjour!.rename(name),
+      agentFlow: server.agentFlow,
+      callRpc: server.callLocal });
     if (closing) return controller;
     await controller.refresh();
     if (closing) return controller;

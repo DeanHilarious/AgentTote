@@ -24,8 +24,25 @@ struct MenuPanel: View {
                     .foregroundStyle(runForeground)
                     .padding(.horizontal, 10).padding(.vertical, 6)
                     .background(runBackground, in: Capsule())
-                    .accessibilityLabel(model.state.label)
+                    .accessibilityLabel(Text(LocalizedStringKey(model.state.label)))
                     .fixedSize(horizontal: false, vertical: true)
+            }
+            HStack(spacing: 8) {
+                Button {
+                    model.hubInitialSection = .commandCenter
+                    show("hub")
+                } label: {
+                    Label("Open AgentTote Hub", systemImage: "macwindow")
+                }
+                .buttonStyle(RelayButtonStyle(compact: true))
+
+                Button {
+                    model.hubInitialSection = .agentFlow
+                    show("hub")
+                } label: {
+                    Label("Agent-Flow Studio…", systemImage: "point.3.connected.trianglepath.dotted")
+                }
+                .buttonStyle(TintedButtonStyle(compact: true))
             }
             if model.fatalCode == "port_in_use" {
                 VStack(alignment: .leading, spacing: 8) {
@@ -81,7 +98,7 @@ struct MenuPanel: View {
                                     .buttonStyle(CompactConnectButtonStyle())
                                     .accessibilityLabel("Install Cursor CLI")
                             } else {
-                                Text(agent?.statusLabel ?? (model.isRunning ? "Not installed" : "—"))
+                                Text(LocalizedStringKey(agent?.statusLabel ?? (model.isRunning ? "Not installed" : "—")))
                                     .font(.caption.weight(.semibold)).foregroundStyle(agent?.status == "ready" ? Brand.successText : Brand.muted)
                             }
                         }
@@ -129,7 +146,7 @@ struct MenuPanel: View {
         .onReceive(Timer.publish(every: 10, on: .main, in: .common).autoconnect()) { _ in onPower = Self.isOnPower }
     }
 
-    private var runTitle: String {
+    private var runTitle: LocalizedStringKey {
         switch model.state {
         case .running: "Running"
         case .starting: "Starting…"
@@ -156,7 +173,7 @@ struct MenuPanel: View {
     }
     private func statistic(_ label: String, value: String, color: Color) -> some View {
         VStack(alignment: .leading, spacing: 3) {
-            Text(label).font(.caption).foregroundStyle(Brand.muted)
+            Text(LocalizedStringKey(label)).font(.caption).foregroundStyle(Brand.muted)
             Text(value).font(Brand.title(20, relativeTo: .title3)).foregroundStyle(color)
         }
         .frame(maxWidth: .infinity, alignment: .leading).padding(12).brandCard(radius: 12)
@@ -166,7 +183,7 @@ struct MenuPanel: View {
         Brand.agentColor(kind)
     }
     private func menuItem(_ title: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) { Text(title).frame(maxWidth: .infinity, minHeight: 44, alignment: .leading).padding(.horizontal, 6).contentShape(Rectangle()) }
+        Button(action: action) { Text(LocalizedStringKey(title)).frame(maxWidth: .infinity, minHeight: 44, alignment: .leading).padding(.horizontal, 6).contentShape(Rectangle()) }
             .buttonStyle(.plain)
     }
     private func show(_ id: String) {

@@ -108,7 +108,7 @@ struct BrandMark: View {
 struct BrandWordmark: View {
     var size: CGFloat = 32
     var body: some View {
-        (Text("Agent").foregroundColor(Brand.ink) + Text("Tote").foregroundColor(Color(light: 0x4B3AF0, dark: 0xA59AFF)))
+        (Text(verbatim: "Agent").foregroundColor(Brand.ink) + Text(verbatim: "Tote").foregroundColor(Color(light: 0x4B3AF0, dark: 0xA59AFF)))
             .font(Brand.title(size, relativeTo: size >= 28 ? .largeTitle : .headline, weight: .bold))
             .accessibilityLabel("AgentTote")
     }
@@ -201,7 +201,7 @@ struct BrandChannelPicker: View {
         HStack(spacing: 6) {
             ForEach(channels) { channel in
                 Button { selection = channel } label: {
-                    Text(channel.label).font(.body.weight(.semibold))
+                    Text(LocalizedStringKey(channel.label)).font(.body.weight(.semibold))
                         .foregroundStyle(selection == channel ? Brand.ink : Brand.muted)
                         .frame(maxWidth: .infinity, minHeight: 44)
                         .background(selection == channel ? Brand.surface : .clear, in: RoundedRectangle(cornerRadius: 10))
@@ -231,7 +231,7 @@ extension View {
         listRowBackground(Brand.surface).listRowSeparatorTint(Brand.separator)
     }
 
-    func brandNavigationTitle(_ title: String) -> some View {
+    func brandNavigationTitle(_ title: LocalizedStringKey) -> some View {
         navigationTitle(title).navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .principal) { Text(title).font(Brand.title(20, relativeTo: .headline)) } }
     }
@@ -255,7 +255,7 @@ struct BrandPasswordField: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(title).font(.caption.weight(.semibold)).foregroundStyle(Brand.muted)
+            Text(LocalizedStringKey(title)).font(.caption.weight(.semibold)).foregroundStyle(Brand.muted)
             HStack(spacing: 0) {
                 Group {
                     if visible { TextField(title, text: $text) }

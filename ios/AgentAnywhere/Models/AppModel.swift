@@ -31,6 +31,8 @@ final class AppModel {
     private(set) var sessions: [AgentKind: [SessionSummary]] = [:]
     private(set) var tasks: [String: TaskInfo] = [:]
     private(set) var events: [String: [TaskEvent]] = [:]
+    private(set) var agentFlow: AgentFlowSnapshot?
+    private(set) var agentFlowSupported = true
     // Draft observations belong to the draft bubble, not the conversation's event list.
     let draftStore = TaskDraftStore()
     var drafts: [String: TaskDraft] { draftStore.drafts }
@@ -615,6 +617,10 @@ final class AppModel {
         registeredPushToken = nil
         let epoch = connectionGeneration
         Task {
+            guard epoch == connectionGeneration, isConnected else { return }
+            await refreshAgentFlow()
+        }
+        Task {
             _ = await registerPush()
             guard epoch == connectionGeneration, isConnected else { return }
             await syncTasks()
@@ -717,6 +723,8 @@ final class AppModel {
         sessions = [:]
         tasks = [:]
         events = [:]
+        agentFlow = nil
+        agentFlowSupported = true
         draftStore.reset()
         bridgeVersion = nil
         bridgeDeviceId = nil
@@ -763,6 +771,28 @@ final class AppModel {
 
     func refreshAgents() async throws {
         agents = try await bridgeCall("agents.list")
+    }
+
+    func refreshAgentFlow(limit: Int = 40) async {
+        guard isConnected else { return }
+        let epoch = connectionGeneration
+        do {
+            let snap: AgentFlowSnapshot = try await bridgeCall("agentFlow.snapshot", ["limit": limit])
+            guard epoch == connectionGeneration, isConnected else { return }
+            self.agentFlow = snap
+            self.agentFlowSupported = true
+        } catch {
+            let description = "\(error.localizedDescription) \(String(describing: error))"
+            if description.localizedCaseInsensitiveContains("Unknown method") {
+                if epoch == connectionGeneration {
+                    self.agentFlowSupported = false
+                }
+            }
+        }
+    }
+
+    func loadAgentFlowRun(id: String) async throws -> AgentFlowRunDetail {
+        try await bridgeCall("agentFlow.run", ["id": id])
     }
 
     /// Keep an old catalog when refresh fails; only a successful response can invalidate a selection.

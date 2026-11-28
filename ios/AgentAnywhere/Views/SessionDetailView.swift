@@ -413,7 +413,7 @@ struct SessionDetailView: View {
         Menu {
             Picker("Permissions", selection: $mode) {
                 ForEach(PermissionMode.allCases) { m in
-                    Label { Text(m.label); Text(m.explanation) } icon: { Image(systemName: m.symbol) }.tag(m)
+                    Label { Text(LocalizedStringKey(m.label)); Text(LocalizedStringKey(m.explanation)) } icon: { Image(systemName: m.symbol) }.tag(m)
                 }
             }
         } label: {

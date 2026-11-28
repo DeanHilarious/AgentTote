@@ -75,11 +75,14 @@ struct HomeView: View {
                         }.buttonStyle(.plain)
                     }
                 }
-                WebPreviewsSection()
                 if typeSize.isAccessibilitySize {
                     Button { showAgentRequest = true } label: { Label("Want another agent?", systemImage: "plus") }
                         .font(.subheadline.weight(.medium)).foregroundStyle(Brand.relayText).frame(minHeight: 44)
                 }
+                if model.isConnected && model.agentFlowSupported {
+                    AgentFlowHomeCard()
+                }
+                WebPreviewsSection()
                 if let claude = model.agent(.claude), claude.status == .needsLogin, let detail = claude.detail {
                     Label(detail, systemImage: "exclamationmark.triangle")
                         .font(.footnote).foregroundStyle(Brand.warning)
@@ -111,11 +114,18 @@ struct HomeView: View {
         .toolbar(.hidden, for: .navigationBar)
         .navigationDestination(for: AgentKind.self) { SessionsView(agent: $0) }
         .navigationDestination(for: SessionRoute.self) { SessionDetailView(route: $0) }
+        .navigationDestination(for: AgentFlowRoute.self) { route in
+            switch route {
+            case .studio: AgentFlowView()
+            case .run(let id): AgentFlowRunDetailView(runId: id)
+            }
+        }
         .refreshable {
             await model.account.restore()
             if model.isConnected {
                 try? await model.refreshAgents()
                 await model.syncTasks()
+                await model.refreshAgentFlow()
             } else {
                 await model.connect()
             }
@@ -191,7 +201,7 @@ private struct ConnectionHeader: View {
             HStack(spacing: 12) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Your Mac").font(.caption).foregroundStyle(Color(hex: 0xB9BBC6))
-                    Text(model.selectedMac?.name ?? "No Mac").font(Brand.title(24, relativeTo: .title2)).foregroundStyle(.white)
+                    (model.selectedMac.map { Text(verbatim: $0.name) } ?? Text("No Mac")).font(Brand.title(24, relativeTo: .title2)).foregroundStyle(.white)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: 0)
@@ -232,9 +242,9 @@ private struct ConnectionHeader: View {
     }
     private var connected: some View { capsule("● Connected", foreground: Color(hex: 0x7EE2A6), background: Color(hex: 0x1F8A4C).opacity(0.25)) }
     private func transport(_ host: String, viaRelay: Bool) -> some View {
-        capsule(viaRelay ? "via relay" : host, foreground: Color(hex: 0xE4E5EA), background: .white.opacity(0.1))
+        capsule(viaRelay ? "via relay" : "\(host)", foreground: Color(hex: 0xE4E5EA), background: .white.opacity(0.1))
     }
-    private func capsule(_ text: String, foreground: Color, background: Color) -> some View {
+    private func capsule(_ text: LocalizedStringKey, foreground: Color, background: Color) -> some View {
         Text(text).font(.caption.weight(.medium)).foregroundStyle(foreground)
             .padding(.horizontal, 12).padding(.vertical, 8).background(background, in: Capsule())
     }
@@ -256,7 +266,7 @@ private struct AgentRow: View {
         .padding(12).frame(maxWidth: .infinity, alignment: .leading)
         .frame(height: cardHeight, alignment: .topLeading).brandCard()
     }
-    private var subtitle: String {
+    private var subtitle: LocalizedStringKey {
         guard let info else { return "Waiting for Mac…" }
         switch info.status {
         case .ready: return "Ready · \(info.runningProcesses) open"

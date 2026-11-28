@@ -143,3 +143,107 @@ export type PushMessage =
   | { event: 'task.delta'; data: { taskId: string; messageId: string; text: string; /** UTF-16 code units. */ offset: number } }
   | { event: 'task.event'; data: { taskId: string; event: TaskEvent } }
   | { event: 'task.updated'; data: TaskInfo };
+
+// ---- Agent-Flow Studio ----
+
+export interface AgentFlowUsage {
+  inputTokens: number;
+  outputTokens: number;
+  thinkingTokens: number;
+  cacheReadTokens: number;
+  totalTokens: number;
+  cacheHitRate: number;
+  source?: string;
+}
+
+export interface AgentFlowTeamMember {
+  id: string;
+  name: string;
+  shortName: string;
+  account: string;
+  tier: 'orchestrator' | 'executor' | 'bridge';
+  role: string;
+  defaultModel: string;
+  accent: string;
+  badge: string;
+  binName: string;
+  status: AgentStatus;
+  runningProcesses: number;
+  version?: string;
+  detail?: string;
+  isBridgeAgent: boolean;
+}
+
+export interface AgentFlowNode {
+  id: string;
+  label: string;
+  agent: string;
+  model: string;
+  effort?: string;
+  status: 'dispatched' | 'delivered' | 'accepted' | 'rejected' | 'event';
+  round: number;
+  startedAt: number;
+  updatedAt: number;
+  durationMs: number;
+  summary: string;
+  note?: string;
+  artifacts: string[];
+  usage: AgentFlowUsage;
+  eventCount: number;
+}
+
+export interface AgentFlowEvent {
+  seq: number;
+  ts: number;
+  sub: string;
+  event: string;
+  agent: string;
+  model: string;
+  effort?: string;
+  round: number;
+  summary: string;
+  note?: string;
+  artifacts: string[];
+  usage?: AgentFlowUsage;
+}
+
+export interface AgentFlowRunSummary {
+  id: string;
+  slug: string;
+  name: string;
+  source: 'agent-flow' | 'codex-runs' | 'bridge-live';
+  status: 'dispatched' | 'delivered' | 'accepted' | 'rejected' | 'idle';
+  createdAt: number;
+  updatedAt: number;
+  durationMs: number;
+  agents: string[];
+  nodeCount: number;
+  acceptedCount: number;
+  rejectedCount: number;
+  eventCount: number;
+  hasSpec: boolean;
+  artifacts: string[];
+  usage: AgentFlowUsage;
+}
+
+export interface AgentFlowRunDetail extends AgentFlowRunSummary {
+  nodes: AgentFlowNode[];
+  events: AgentFlowEvent[];
+  spec: string | null;
+}
+
+export interface AgentFlowSnapshot {
+  updatedAt: number;
+  summary: {
+    totalRuns: number;
+    activeRuns: number;
+    acceptedRuns: number;
+    onlineMembers: number;
+    totalMembers: number;
+    liveTasksCount: number;
+    usage: AgentFlowUsage;
+  };
+  team: AgentFlowTeamMember[];
+  liveTasks: TaskInfo[];
+  runs: AgentFlowRunSummary[];
+}

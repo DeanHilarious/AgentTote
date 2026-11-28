@@ -139,7 +139,7 @@ struct SessionsView: View {
         .brandList()
         .listStyle(.insetGrouped)
         .toolbar(.visible, for: .navigationBar)
-        .brandNavigationTitle(agent.displayName)
+        .brandNavigationTitle("\(agent.displayName)")
         .searchable(text: $query, prompt: "Search sessions")
         .refreshable { await load() }
         .task { await load() }

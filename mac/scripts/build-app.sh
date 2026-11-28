@@ -116,6 +116,9 @@ PLIST
 mkdir -p "$APP/Contents/Resources/en.lproj" "$APP/Contents/Resources/zh-Hans.lproj"
 printf '"CFBundleDisplayName" = "AgentTote";\n"CFBundleName" = "AgentTote";\n' > "$APP/Contents/Resources/en.lproj/InfoPlist.strings"
 printf '"CFBundleDisplayName" = "口袋智能体";\n"CFBundleName" = "口袋智能体";\n' > "$APP/Contents/Resources/zh-Hans.lproj/InfoPlist.strings"
+for language in en zh-Hans; do
+    cp "$ROOT/ios/AgentAnywhere/$language.lproj/Localizable.strings" "$APP/Contents/Resources/$language.lproj/"
+done
 plutil -insert AAUpdateFeedURL -string "${AA_UPDATE_FEED_URL:-https://agent-anywhere.nuts-claw.tech/updates/mac/latest.json}" "$APP/Contents/Info.plist"
 if [[ -f "$MAC/ota-public-key.txt" ]]; then
     OTA_PUBLIC_KEY="$(node --input-type=module - "$MAC/ota-public-key.txt" <<'NODE'

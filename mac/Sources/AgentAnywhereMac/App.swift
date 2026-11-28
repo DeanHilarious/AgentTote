@@ -9,12 +9,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private enum TerminationState { case running, shuttingDown, ready }
     private var terminationState = TerminationState.running
 
+    static var isRunningTests: Bool {
+        ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+            || NSClassFromString("XCTestCase") != nil
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         Brand.registerFonts()
         signal(SIGPIPE, SIG_IGN)
-        NSApp.setActivationPolicy(.accessory)
+        NSApp.setActivationPolicy(.regular)
         model.start()
         updater.start()
+        if !Self.isRunningTests {
+            DispatchQueue.main.async {
+                NotificationCenter.default.post(name: .showMainWindow, object: nil)
+            }
+        }
     }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
@@ -49,11 +59,18 @@ extension Notification.Name {
 private struct MenuBarLabel: View {
     let model: BridgeModel
     @Environment(\.openWindow) private var openWindow
+    @State private var didOpenOnLaunch = false
 
     var body: some View {
         Image(nsImage: Brand.menuBarImage).accessibilityLabel("AgentTote: \(model.state.label)")
+            .task {
+                guard !didOpenOnLaunch, !AppDelegate.isRunningTests else { return }
+                didOpenOnLaunch = true
+                openWindow(id: "hub")
+                NSApp.activate(ignoringOtherApps: true)
+            }
             .onReceive(NotificationCenter.default.publisher(for: .showMainWindow)) { _ in
-                openWindow(id: "settings")
+                openWindow(id: "hub")
                 NSApp.activate(ignoringOtherApps: true)
             }
     }
@@ -61,38 +78,52 @@ private struct MenuBarLabel: View {
 
 @main
 struct AgentAnywhereMacApp: App {
+    @AppStorage(InterfaceLanguagePicker.preferenceKey) private var language = InterfaceLanguagePicker.initialLanguage
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
 
     var body: some Scene {
         MenuBarExtra {
             MenuPanel().environment(delegate.model).environment(delegate.system).environment(delegate.updater)
+                .environment(\.locale, Locale(identifier: language))
         } label: {
             MenuBarLabel(model: delegate.model)
+                .environment(\.locale, Locale(identifier: language))
         }
         .menuBarExtraStyle(.window)
 
+        Window("AgentTote Hub", id: "hub") {
+            AgentHubView().environment(delegate.model).environment(delegate.system).environment(delegate.updater)
+                .environment(\.locale, Locale(identifier: language))
+        }
+        .defaultSize(width: 1240, height: 800)
+
         Window("Pairing", id: "pairing") {
             PairingView().environment(delegate.model)
+                .environment(\.locale, Locale(identifier: language))
         }
         .defaultSize(width: 420, height: 560)
         .windowResizability(.contentSize)
         Window("Account", id: "account") {
             AccountView().environment(delegate.model)
+                .environment(\.locale, Locale(identifier: language))
         }
         .defaultSize(width: 440, height: 520)
         .windowResizability(.contentSize)
         Window("Settings", id: "settings") {
             SettingsView().environment(delegate.model).environment(delegate.system).environment(delegate.updater)
+                .environment(\.locale, Locale(identifier: language))
         }
         .defaultSize(width: 460, height: 520)
         .windowResizability(.contentSize)
         Window("Connect WorkBuddy", id: "connect-workbuddy") {
             ConnectWorkBuddyView().environment(delegate.model)
+                .environment(\.locale, Locale(identifier: language))
         }
         .defaultSize(width: 460, height: 400)
         .windowResizability(.contentSize)
         Window("Logs", id: "logs") {
             LogsView().environment(delegate.model)
+                .environment(\.locale, Locale(identifier: language))
         }
         .defaultSize(width: 760, height: 460)
     }

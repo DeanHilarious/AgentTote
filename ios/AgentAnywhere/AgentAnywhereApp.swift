@@ -2,6 +2,7 @@ import SwiftUI
 
 @main
 struct AgentAnywhereApp: App {
+    @AppStorage(InterfaceLanguagePicker.preferenceKey) private var language = InterfaceLanguagePicker.initialLanguage
     @UIApplicationDelegateAdaptor(PushAppDelegate.self) private var pushDelegate
     @State private var model = AppModel()
     @Environment(\.scenePhase) private var scenePhase
@@ -11,6 +12,7 @@ struct AgentAnywhereApp: App {
             RootView()
                 .environment(model)
                 .environment(model.account)
+                .environment(\.locale, Locale(identifier: language))
                 .tint(Brand.relayText)
                 .task {
                     model.start()

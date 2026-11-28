@@ -26,6 +26,8 @@ struct AccountView: View {
                     Spacer()
                     Button("Done") { dismiss() }.frame(minWidth: 44, minHeight: 44)
                 }
+                InterfaceLanguagePicker()
+                    .pickerStyle(.menu)
                 profile
                 if account.user?.phone != nil && account.user?.email == nil {
                     Button { bindingChannel = .email } label: {
@@ -196,7 +198,7 @@ struct AccountView: View {
 
     private func group<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(title).font(Brand.title(20, relativeTo: .title3)).padding(.leading, 4)
+            Text(LocalizedStringKey(title)).font(Brand.title(20, relativeTo: .title3)).padding(.leading, 4)
             content()
         }
     }
@@ -204,7 +206,7 @@ struct AccountView: View {
     private func securityRow(_ title: String, icon: String, value: String? = nil) -> some View {
         HStack(spacing: 12) {
             AccountIcon(symbol: icon)
-            Text(title).font(.subheadline)
+            Text(LocalizedStringKey(title)).font(.subheadline)
             Spacer(minLength: 8)
             if let value { Text(value).font(.subheadline).foregroundStyle(Brand.muted).multilineTextAlignment(.trailing) }
             Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(Brand.muted).accessibilityHidden(true)

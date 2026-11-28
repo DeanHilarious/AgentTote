@@ -20,6 +20,8 @@ struct SettingsView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
+                InterfaceLanguagePicker()
+                    .pickerStyle(.segmented)
                 BrandFormSection("Updates") {
                     UpdateBanner()
                     if updater.enabled {
@@ -35,7 +37,7 @@ struct SettingsView: View {
                     Text("Port").font(.caption.weight(.semibold)).foregroundStyle(Brand.muted)
                     TextField("Port", text: $port).monospaced()
                     Picker("Keep Mac awake", selection: $keepAwake) {
-                        ForEach(KeepAwakeMode.allCases) { mode in Text(mode.label).tag(mode) }
+                        ForEach(KeepAwakeMode.allCases) { mode in Text(LocalizedStringKey(mode.label)).tag(mode) }
                     }
                     Text("Closing the lid still puts the Mac to sleep unless an external display is connected. A sleeping Mac can't be reached from your phone.")
                         .font(.caption).foregroundStyle(Brand.muted)

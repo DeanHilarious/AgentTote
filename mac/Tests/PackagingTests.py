@@ -62,6 +62,10 @@ class PackagingTests(unittest.TestCase):
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
         shutil.copytree(SCRIPTS, self.root / "mac/scripts")
+        for language in ("en", "zh-Hans"):
+            strings = Path(f"ios/AgentAnywhere/{language}.lproj/Localizable.strings")
+            (self.root / strings.parent).mkdir(parents=True)
+            shutil.copyfile(SCRIPTS.parents[1] / strings, self.root / strings)
         (self.root / "bridge").mkdir()
         (self.root / "bridge/package.json").write_text('{"version":"1.2.3"}')
         remote = self.root / "remote"
@@ -114,6 +118,8 @@ class PackagingTests(unittest.TestCase):
         self.assertEqual(first["CFBundleIdentifier"], "com.deanhilarious.agentanywhere.mac")
         localized_name = info_path.parent / "Resources/zh-Hans.lproj/InfoPlist.strings"
         self.assertIn('"CFBundleDisplayName" = "口袋智能体";', localized_name.read_text())
+        strings = localized_name.with_name("Localizable.strings")
+        self.assertIn('"Accepted" = "已验收";', strings.read_text())
         self.assertTrue(first["CFBundleVersion"].isdigit())
         self.assertEqual(first["AAUpdateFeedURL"], "https://agent-anywhere.nuts-claw.tech/updates/mac/latest.json")
         self.assertNotIn("AAUpdatePublicKey", first)

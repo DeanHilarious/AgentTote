@@ -20,6 +20,8 @@ struct LoginView: View {
             else { try await account.signIn(email: email, password: password) }
             dismiss()
         } footer: {
+            InterfaceLanguagePicker()
+                .pickerStyle(.menu)
             if flow == "login" {
                 Button("Create an account") { flow = "register" }
                 Button("Forgot password?") { flow = "reset" }
@@ -123,7 +125,7 @@ private struct EmailAuthForm<Footer: View>: View {
             VStack(alignment: .leading, spacing: 24) {
                 BrandMark(size: 56).onLongPressGesture(minimumDuration: 2, perform: openServer)
                 BrandWordmark()
-                Text(title).font(.title2.bold())
+                Text(LocalizedStringKey(title)).font(.title2.bold())
                 if showMacSetupGuide {
                     MacSetupGuide()
                 }
@@ -161,7 +163,7 @@ private struct EmailAuthForm<Footer: View>: View {
                     }
                     if let error { Text(error).font(.footnote).foregroundStyle(Brand.failure) }
                     Button { Task { await submit() } } label: {
-                        if busy { ProgressView().tint(.white) } else { Text(title) }
+                        if busy { ProgressView().tint(.white) } else { Text(LocalizedStringKey(title)) }
                     }.buttonStyle(PrimaryButtonStyle()).disabled(!canSubmit)
                 }.disabled(busy)
                 VStack(spacing: 16) { footer() }.disabled(busy).frame(maxWidth: .infinity)

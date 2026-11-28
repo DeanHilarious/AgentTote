@@ -57,6 +57,13 @@ final class BridgeModel {
     private(set) var fatalCode: String?
     private(set) var restarting = false
     private(set) var shuttingDown = false
+    private(set) var tasks: [String: HubTaskInfo] = [:]
+    private(set) var taskEvents: [String: [HubTaskEvent]] = [:]
+    private(set) var taskDrafts: [String: HubTaskDraft] = [:]
+    private(set) var sessionsByAgent: [String: [HubSessionSummary]] = [:]
+    private(set) var modelsByAgent: [String: [HubModelOption]] = [:]
+    private(set) var recentProjects: [HubProjectDir] = []
+    var hubInitialSection: HubSection = .commandCenter
     @ObservationIgnored let bridge: BridgeProcess
     @ObservationIgnored private var redactor = LogRedactor()
 
@@ -105,6 +112,12 @@ final class BridgeModel {
             pairingUrl = ""
             hosts = []
             agents = []
+            tasks = [:]
+            taskEvents = [:]
+            taskDrafts = [:]
+            sessionsByAgent = [:]
+            modelsByAgent = [:]
+            recentProjects = []
         }
     }
 
@@ -127,8 +140,55 @@ final class BridgeModel {
             fatalCode = reason.code
             setState(.failed(redactor.redact(reason.message)))
             appendLog(reason.message, source: "bridge")
+        case .taskUpdated(let task):
+            tasks[task.id] = task
+            if task.status != .running {
+                taskDrafts.removeValue(forKey: task.id)
+            }
+        case .taskEvent(let envelope):
+            mergeTaskEvents(taskId: envelope.taskId, incoming: [envelope.event])
+            if envelope.event.kind == "text" {
+                taskDrafts.removeValue(forKey: envelope.taskId)
+            }
+        case .taskDelta(let delta):
+            taskDrafts[delta.taskId] = Self.applyDelta(current: taskDrafts[delta.taskId], delta: delta)
         case .unknown: break
         }
+    }
+
+    var sortedTasks: [HubTaskInfo] {
+        tasks.values.sorted { lhs, rhs in
+            if (lhs.status == .running) != (rhs.status == .running) {
+                return lhs.status == .running
+            }
+            if lhs.startedAt != rhs.startedAt {
+                return lhs.startedAt > rhs.startedAt
+            }
+            return lhs.id < rhs.id
+        }
+    }
+
+    private func mergeTaskEvents(taskId: String, incoming: [HubTaskEvent]) {
+        guard !incoming.isEmpty else { return }
+        var bySeq: [Int: HubTaskEvent] = [:]
+        for existing in taskEvents[taskId] ?? [] {
+            bySeq[existing.seq] = existing
+        }
+        for event in incoming {
+            bySeq[event.seq] = event
+        }
+        taskEvents[taskId] = bySeq.values.sorted { $0.seq < $1.seq }
+    }
+
+    static func applyDelta(current: HubTaskDraft?, delta: HubTaskDeltaEnvelope) -> HubTaskDraft {
+        guard let existing = current, existing.messageId == delta.messageId, delta.offset > 0 else {
+            return HubTaskDraft(messageId: delta.messageId, text: delta.text)
+        }
+        let utf16 = existing.text.utf16
+        let clampedOffset = min(delta.offset, utf16.count)
+        let prefixUnits = Array(utf16.prefix(clampedOffset))
+        let prefix = String(decoding: prefixUnits, as: UTF16.self)
+        return HubTaskDraft(messageId: delta.messageId, text: prefix + delta.text)
     }
 
     private func apply(_ snapshot: BridgeSnapshot) {
@@ -220,5 +280,143 @@ final class BridgeModel {
     func resumeAfterFailedUpdate() {
         shuttingDown = false
         start()
+    }
+
+    // MARK: - Desktop AgentHub & Agent-Flow RPCs
+
+    @discardableResult
+    func loadSessions(agent: String, limit: Int = 40) async throws -> [HubSessionSummary] {
+        let sessions: [HubSessionSummary] = try await bridge.request(
+            "sessions.list",
+            params: ["agent": .string(agent), "limit": .number(Double(limit))]
+        ).decode()
+        sessionsByAgent[agent] = sessions
+        return sessions
+    }
+
+    func loadMessages(agent: String, sessionId: String, limit: Int = 100) async throws -> [HubChatMessage] {
+        try await bridge.request(
+            "sessions.messages",
+            params: [
+                "agent": .string(agent),
+                "sessionId": .string(sessionId),
+                "limit": .number(Double(limit))
+            ]
+        ).decode()
+    }
+
+    @discardableResult
+    func loadModels(agent: String) async throws -> [HubModelOption] {
+        let result: HubAgentModelsResult = try await bridge.request(
+            "agents.models",
+            params: ["agent": .string(agent)]
+        ).decode()
+        modelsByAgent[agent] = result.models
+        return result.models
+    }
+
+    @discardableResult
+    func loadRecentProjects(limit: Int = 30) async throws -> [HubProjectDir] {
+        let dirs: [HubProjectDir] = try await bridge.request(
+            "projects.recent",
+            params: ["limit": .number(Double(limit))]
+        ).decode()
+        recentProjects = dirs
+        return dirs
+    }
+
+    @discardableResult
+    func syncTasks() async throws -> [HubTaskInfo] {
+        let list: [HubTaskInfo] = try await bridge.request("tasks.list").decode()
+        var next: [String: HubTaskInfo] = [:]
+        for item in list {
+            next[item.id] = item
+        }
+        tasks = next
+        let liveIds = Set(next.keys)
+        taskDrafts = taskDrafts.filter { liveIds.contains($0.key) && next[$0.key]?.status == .running }
+        return list
+    }
+
+    @discardableResult
+    func loadTaskSnapshot(taskId: String, sinceSeq: Int = 0) async throws -> HubTaskSnapshot {
+        let snapshot: HubTaskSnapshot = try await bridge.request(
+            "tasks.get",
+            params: [
+                "taskId": .string(taskId),
+                "sinceSeq": .number(Double(sinceSeq))
+            ]
+        ).decode()
+        tasks[snapshot.task.id] = snapshot.task
+        mergeTaskEvents(taskId: snapshot.task.id, incoming: snapshot.events)
+        if snapshot.task.status == .running, let draft = snapshot.draft {
+            taskDrafts[snapshot.task.id] = draft
+        } else if snapshot.task.status != .running {
+            taskDrafts.removeValue(forKey: snapshot.task.id)
+        }
+        return snapshot
+    }
+
+    @discardableResult
+    func startTask(
+        agent: String,
+        sessionId: String? = nil,
+        cwd: String? = nil,
+        prompt: String,
+        permissionMode: HubPermissionMode = .acceptEdits,
+        model: String? = nil,
+        effort: String? = nil,
+        fork: Bool = false
+    ) async throws -> HubTaskInfo {
+        var params: [String: JSONValue] = [
+            "agent": .string(agent),
+            "prompt": .string(prompt),
+            "permissionMode": .string(permissionMode.rawValue)
+        ]
+        if let sessionId, !sessionId.isEmpty {
+            params["sessionId"] = .string(sessionId)
+        }
+        if let cwd, !cwd.isEmpty {
+            params["cwd"] = .string(cwd)
+        }
+        if let model, !model.isEmpty {
+            params["model"] = .string(model)
+        }
+        if let effort, !effort.isEmpty {
+            params["effort"] = .string(effort)
+        }
+        if fork {
+            params["fork"] = .bool(true)
+        }
+        let info: HubTaskInfo = try await bridge.request("tasks.start", params: params).decode()
+        tasks[info.id] = info
+        return info
+    }
+
+    @discardableResult
+    func cancelTask(taskId: String) async throws -> HubTaskInfo {
+        let info: HubTaskInfo = try await bridge.request(
+            "tasks.cancel",
+            params: ["taskId": .string(taskId)]
+        ).decode()
+        tasks[info.id] = info
+        if info.status != .running {
+            taskDrafts.removeValue(forKey: info.id)
+        }
+        return info
+    }
+
+    func fetchAgentFlowSnapshot(limit: Int = 40) async throws -> AgentFlowSnapshot {
+        try await bridge.request(
+            "agentFlow.snapshot",
+            params: ["limit": .number(Double(limit))]
+        ).decode()
+    }
+
+    func fetchAgentFlowRun(id: String) async throws -> AgentFlowRunDetail {
+        try await bridge.request(
+            "agentFlow.run",
+            params: ["id": .string(id)]
+        ).decode()
     }
 }

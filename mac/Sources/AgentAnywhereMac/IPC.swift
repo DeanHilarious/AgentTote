@@ -173,7 +173,7 @@ struct BridgeNetwork: Decodable {
 }
 
 enum IPCEvent: Decodable {
-    case keepAwake(KeepAwakeStatus), relay(RelayStatus), ready(BridgeSnapshot), network(BridgeNetwork), clients(Int), agents([AgentInfo]), account(AccountStatus), log(BridgeLog), fatal(IPCFailure), unknown
+    case keepAwake(KeepAwakeStatus), relay(RelayStatus), ready(BridgeSnapshot), network(BridgeNetwork), clients(Int), agents([AgentInfo]), account(AccountStatus), log(BridgeLog), fatal(IPCFailure), taskUpdated(HubTaskInfo), taskEvent(HubTaskEventEnvelope), taskDelta(HubTaskDeltaEnvelope), unknown
     private enum Keys: String, CodingKey { case event, data }
     private struct Clients: Decodable { let count: Int }
 
@@ -189,6 +189,9 @@ enum IPCEvent: Decodable {
         case "account": self = .account(try c.decode(AccountStatus.self, forKey: .data))
         case "log": self = .log(try c.decode(BridgeLog.self, forKey: .data))
         case "fatal": self = .fatal(try c.decode(IPCFailure.self, forKey: .data))
+        case "task.updated": self = .taskUpdated(try c.decode(HubTaskInfo.self, forKey: .data))
+        case "task.event": self = .taskEvent(try c.decode(HubTaskEventEnvelope.self, forKey: .data))
+        case "task.delta": self = .taskDelta(try c.decode(HubTaskDeltaEnvelope.self, forKey: .data))
         default: self = .unknown
         }
     }
@@ -223,7 +226,10 @@ final class IPCRequests {
     var count: Int { pending.count }
     static func timeout(for method: String) -> TimeInterval {
         if method == "workbuddy.setKey" { return 210 } // Two 90-second verification attempts plus IPC overhead.
-        return method.hasPrefix("account.") ? 30 : 15
+        if method.hasPrefix("account.") || method == "tasks.start" || method.hasPrefix("sessions.") || method == "agents.models" {
+            return 30
+        }
+        return 15
     }
 
     func request(method: String, params: [String: JSONValue] = [:], timeout: TimeInterval? = nil,

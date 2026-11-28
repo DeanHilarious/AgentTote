@@ -66,7 +66,7 @@ struct TaskStatusBadge: View {
             .background(background, in: Capsule())
     }
 
-    private var title: String {
+    private var title: LocalizedStringKey {
         switch status {
         case .running: "Running"
         case .completed: "Done"

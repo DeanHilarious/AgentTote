@@ -1,6 +1,7 @@
 import { ProjectFiles, type FileParams } from './files.ts';
 import { WebPreviews, type PreviewRequest } from './preview.ts';
 import { agentIcons, withAgentIcon, type IconProvider } from './agentIcons.ts';
+import { AgentFlowStore, type AgentFlowOptions } from './agentFlow.ts';
 import { timingSafeEqual } from 'node:crypto';
 import { createServer } from 'node:http';
 import type { IncomingMessage } from 'node:http';
@@ -99,18 +100,25 @@ export async function bridgeHello(cfg: Pick<BridgeConfig, 'name' | 'deviceId' | 
 
 export function startServer(cfg: BridgeConfig, adapters: Adapter[], log: (msg: string) => void,
   accountContext: () => Pick<UpgradeContext, 'userId' | 'publicKeyPem'> = () => ({}),
-  onClients: (count: number) => void = () => {}, account?: PushAccount, icons: IconProvider = agentIcons) {
+  onClients: (count: number) => void = () => {}, account?: PushAccount, icons: IconProvider = agentIcons,
+  agentFlowOptions?: Omit<AgentFlowOptions, 'getBridgeAgents' | 'getBridgeTasks'>) {
   const rawLog = log;
   log = message => rawLog(redactSecrets(message));
   const installations = new WeakMap<ClientTransport, string>();
   const clients = new Set<ClientTransport>();
   const pairingClients = new Set<WebSocket>();
+  const broadcastListeners = new Set<(msg: PushMessage) => void>();
   const remoteAddresses = new WeakMap<WebSocket, string>();
   // Agent kinds each phone declared in `hello`; phones never see agents they cannot decode.
   const clientAgents = new WeakMap<ClientTransport, Set<AgentKind>>();
+  const localClient: ClientTransport = { kind: 'local', remote: 'mac-hub', send: () => {}, close: () => {} };
+  clientAgents.set(localClient, new Set(AGENTS));
   const legacyAgents = new Set(LEGACY_AGENT_KINDS);
   const supports = (client: ClientTransport, kind: AgentKind) => (clientAgents.get(client) ?? legacyAgents).has(kind);
   const broadcast = (msg: PushMessage) => {
+    for (const listener of broadcastListeners) {
+      try { listener(msg); } catch {}
+    }
     const data = JSON.stringify(msg);
     const taskAgent = msg.event === 'task.updated' ? msg.data.agent
       : msg.event === 'task.event' || msg.event === 'task.delta' ? tasks.agentOf(msg.data.taskId) : undefined;
@@ -128,6 +136,11 @@ export function startServer(cfg: BridgeConfig, adapters: Adapter[], log: (msg: s
   const tasks = new TaskManager(adapters, broadcast, (task, id) => push.send(task, id), (id, text) => previews.observe(id, text));
   const files = new ProjectFiles(() => tasks.allAdapters(), () => cfg.disabledAgents);
   const models = new ModelCatalog();
+  const flow = new AgentFlowStore({
+    ...agentFlowOptions,
+    getBridgeAgents: () => detectEnabledAgents(cfg, tasks.allAdapters(), icons),
+    getBridgeTasks: () => tasks.list(),
+  });
   const installation = (client: ClientTransport) => {
     const id = installations.get(client);
     return push.has(id) ? id : undefined;
@@ -236,6 +249,8 @@ export function startServer(cfg: BridgeConfig, adapters: Adapter[], log: (msg: s
       if (agent && !supports(client, agent)) throw new Error(`Unknown task ${taskId}`);
       return tasks.snapshot(taskId, Number(p.sinceSeq ?? 0) || 0, installation(client));
     },
+    'agentFlow.snapshot': (p) => flow.snapshot(limitParam(p, 40, 100)),
+    'agentFlow.run': (p) => flow.getRun(str(p, 'id')!),
   };
 
   const attachClient = (client: ClientTransport) => {
@@ -324,6 +339,16 @@ export function startServer(cfg: BridgeConfig, adapters: Adapter[], log: (msg: s
   http.on('close', () => { clearInterval(heartbeat); push.close(); previews.close(); });
 
   const controlled = Object.assign(http, {
+    agentFlow: flow,
+    onBroadcast: (listener: (msg: PushMessage) => void) => {
+      broadcastListeners.add(listener);
+      return () => broadcastListeners.delete(listener);
+    },
+    callLocal: async (method: string, params: Record<string, unknown> = {}) => {
+      const handler = Object.hasOwn(handlers, method) ? handlers[method] : undefined;
+      if (!handler) throw new Error(`Unknown method ${method}`);
+      return await handler(params, localClient);
+    },
     agentsUpdated: (data: AgentInfo[]) => broadcast({ event: 'agents.updated',
       data: data.map(({ kind, name, status, version, runningProcesses, detail, iconHash }) =>
         ({ kind, name, status, version, runningProcesses, detail, iconHash })) }),

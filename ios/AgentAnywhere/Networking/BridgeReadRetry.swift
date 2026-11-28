@@ -3,7 +3,7 @@ import Foundation
 enum BridgeReadRetry {
     static func allows(_ method: String) -> Bool {
         switch method {
-        case "hello", "agents.list", "agents.icon", "sessions.list", "sessions.messages", "projects.recent", "tasks.list", "tasks.get": true
+        case "hello", "agents.list", "agents.icon", "sessions.list", "sessions.messages", "projects.recent", "tasks.list", "tasks.get", "agentFlow.snapshot", "agentFlow.run": true
         default: false
         }
     }

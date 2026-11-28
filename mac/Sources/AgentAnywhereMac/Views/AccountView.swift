@@ -50,12 +50,12 @@ struct AccountView: View {
                 if let user = model.account.user {
                     BrandFormSection("Account") {
                         Text(user.identity).font(.headline)
-                        Text(model.account.statusLabel).foregroundStyle(model.account.state == "online" ? Brand.muted : Brand.failure)
+                        Text(LocalizedStringKey(model.account.statusLabel)).foregroundStyle(model.account.state == "online" ? Brand.muted : Brand.failure)
                         Button("Sign out") { Task { await signOut() } }.buttonStyle(DestructiveButtonStyle(fullWidth: false, compact: true)).disabled(busy || !model.isRunning)
                     }
                 } else {
                     if model.account.state == "revoked" {
-                        Text(model.account.statusLabel).foregroundStyle(Brand.failure)
+                        Text(LocalizedStringKey(model.account.statusLabel)).foregroundStyle(Brand.failure)
                     }
                     BrandFormSection(flow == "register" ? "Create account" : flow == "reset" ? "Reset password" : "Sign in") {
                         TextField("Email address", text: $target).textContentType(.emailAddress).disabled(busy)
